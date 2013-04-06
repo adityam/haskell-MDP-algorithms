@@ -4,7 +4,7 @@ module MDP
     -- Types
   , QFunction , VFunction , Policy , ValuePolicyPair
   , qUpdate , vUpdate , bellmanUpdate 
-  , valueIteration
+  , valueIteration , valueIterationN
   ) where
 
 import qualified Data.Vector as V
@@ -120,8 +120,10 @@ valueIteration ε β mdp =
         renormalize ( (v1, _), (v2, p2) ) = let w = N.maxElement (v2-v1)
                                             in (v2 + N.scalar (w/k), p2)
 
-     in map renormalize $ takeWhile (not . stoppingRule) $ pairedIteration
+     in map renormalize . takeWhile (not . stoppingRule) $ pairedIteration
 
+valueIterationN:: Discount -> Double -> MDP -> [(Int, ValuePolicyPair)]
+valueIterationN β ε mdp = zip [2..] (valueIteration β ε mdp)
 
 {-# INLINE spanNorm #-}
 spanNorm :: N.Vector Double -> N.Vector Double -> Double
