@@ -7,11 +7,14 @@ module MDP
   , policyMDP
   , valueIteration , valueIterationN
   , policyIteration, policyIterationN
+  , spanNorm
   ) where
 
 import qualified Data.Vector as V
 import qualified Numeric.LinearAlgebra as N
 import Control.Arrow ( (&&&), (***) )
+
+import Data.Function (on)
 
 -- Data type to model a finite Markov Decision Process (MDP). 
 --
@@ -172,15 +175,15 @@ valueIteration ε β mdp =
         pairedIteration :: [(ValuePolicyPair, ValuePolicyPair)]
         pairedIteration = zip iterations (tail iterations)
 
-        stoppingRule :: (ValuePolicyPair, ValuePolicyPair) -> Bool
-        stoppingRule ((v1,_), (v2,_)) = spanNorm v1 v2 < δ
+        stoppingRule :: ValuePolicyPair -> ValuePolicyPair -> Bool
+        stoppingRule (v1,_) (v2,_) = spanNorm v1 v2 < δ
 
         -- See Puterman 6.6.12 for details
         renormalize :: (ValuePolicyPair, ValuePolicyPair) -> ValuePolicyPair
         renormalize ( (v1, _), (v2, p2) ) = let w = N.maxElement (v2-v1)
                                             in (v2 + N.scalar (w/k), p2)
 
-     in map renormalize . takeWhile (not . stoppingRule) $ pairedIteration
+     in map renormalize . takeWhile (not . uncurry stoppingRule) $ pairedIteration
 
 -- Value iteration that keeps track of the iteration count as well.
 valueIterationN:: Double -> Discount-> MDP -> [(Int, ValuePolicyPair)]
@@ -201,10 +204,11 @@ policyIteration β mdp =
         pairedIteration :: [(ValuePolicyPair, ValuePolicyPair)]
         pairedIteration = zip iterations (tail iterations)
 
-        stoppingRule :: (ValuePolicyPair, ValuePolicyPair) -> Bool
-        stoppingRule ((_,p1), (_,p2)) = p1 == p2
+        stoppingRule :: ValuePolicyPair -> ValuePolicyPair -> Bool
+        -- stoppingRule ((_,p1), (_,p2)) = p1 == p2
+        stoppingRule = (==) `on` snd
 
-     in map snd . takeWhile' (not . stoppingRule) $ pairedIteration
+     in map snd . takeWhile' (not . uncurry stoppingRule) $ pairedIteration
 
 -- Value iteration that keeps track of the iteration count as well.
 --policyIterationN:: Discount -> MDP -> [(Int, ValuePolicyPair)]
