@@ -4,7 +4,9 @@ module MDP
     -- Types
   , QFunction , VFunction , Policy , ValuePolicyPair
   , qUpdate , vUpdate , bellmanUpdate 
+  , policyMDP
   , valueIteration , valueIterationN
+  , policyIteration, policyIterationN
   ) where
 
 import qualified Data.Vector as V
@@ -88,9 +90,67 @@ vUpdate  = (N.fromList *** V.fromList) . unzip . map (N.maxElement &&& N.maxInde
 bellmanUpdate :: Discount -> MDP -> ValuePolicyPair -> ValuePolicyPair
 bellmanUpdate β mdp = vUpdate . qUpdate β mdp 
 
+
+-- Construct a MDP corresponding to a single policy 
+
+-- {-# INLINE policyMDP #-}
+policyMDP :: Discount -> MDP -> Policy -> MDP
+policyMDP β mdp policy =
+    let
+       units :: V.Vector (N.Vector Double)
+       units   = V.fromList . N.toRows . N.ident $ stateSize mdp
+
+       chosenReward :: V.Vector (N.Vector Double)
+       chosenReward = V.backpermute (reward mdp) policy
+
+       -- We can find the rFunction by matrix multilincation, but it is cheaper
+       -- to select elements from a vector
+       --
+       --       rFunction = V.zipWith N.dot units chosenReward
+       --
+       rFunction :: V.Vector Double
+       rFunction = V.imap (flip (N.@>)) chosenReward
+
+       chosenMatrices :: V.Vector (N.Matrix Double)
+       chosenMatrices = V.backpermute (transition mdp) policy
+
+       -- We can find the pMatrix by matrix multilincation, but it is cheaper
+       -- to select rows from a matrix
+       --
+       --       pMatrix = V.zipWith (N.<>) units chosenMatrices
+       --
+       pMatrix :: V.Vector (N.Vector Double)
+       pMatrix = V.imap takeRow chosenMatrices
+
+    in mdp { reward     = V.singleton . N.fromList . V.toList $ rFunction 
+           , transition = V.singleton . N.fromRows . V.toList $ pMatrix 
+           }
+  
+{-# INLINE policyUpdate #-}
+policyUpdate :: Discount -> MDP -> ValuePolicyPair -> ValuePolicyPair 
+policyUpdate β mdp vp = 
+    let
+        -- Find best response policy
+        (_, p2) = bellmanUpdate β mdp vp
+
+        --  Find performance of best response policy using
+        --  $(I - β P(d))^{-1} r(d)$
+        mdp'    = policyMDP β mdp p2
+        matrix  = N.ident (stateSize mdp') - N.scale β (V.head . transition $ mdp')
+        v2      = N.inv matrix N.<> (V.head . reward $ mdp') 
+    in (v2, p2)
+
 -- Start with the all zeros vector and run `bellmanUpdate` until the `spanNorm`
 -- of successive terms with within $ε(1-β)/β$ of each other. This ensures that
 -- the renormalized value function is within $ε$ of the optimal solution.
+
+-- To stop the computation after n iterations, use
+--
+--      take n . valueIteration ε β $ mdp
+--
+-- or (to see the iteration count)
+--
+--      take n . valueIterationN ε β $ mdp
 
 valueIteration :: Double -> Discount -> MDP -> [ValuePolicyPair]
 valueIteration ε β mdp = 
@@ -122,10 +182,50 @@ valueIteration ε β mdp =
 
      in map renormalize . takeWhile (not . stoppingRule) $ pairedIteration
 
-valueIterationN:: Discount -> Double -> MDP -> [(Int, ValuePolicyPair)]
-valueIterationN β ε mdp = zip [2..] (valueIteration β ε mdp)
+-- Value iteration that keeps track of the iteration count as well.
+valueIterationN:: Double -> Discount-> MDP -> [(Int, ValuePolicyPair)]
+valueIterationN ε β mdp = zip [2..] (valueIteration ε β mdp)
+
+policyIteration :: Discount -> MDP -> [ValuePolicyPair]
+policyIteration β mdp = 
+    let 
+        initial :: ValuePolicyPair 
+        initial = (N.konst 0 (stateSize mdp), V.replicate (actionSize mdp) 0)
+
+        policyUpdate' :: ValuePolicyPair -> ValuePolicyPair
+        policyUpdate' = policyUpdate β mdp
+
+        iterations :: [ValuePolicyPair]
+        iterations = iterate policyUpdate' initial
+
+        pairedIteration :: [(ValuePolicyPair, ValuePolicyPair)]
+        pairedIteration = zip iterations (tail iterations)
+
+        stoppingRule :: (ValuePolicyPair, ValuePolicyPair) -> Bool
+        stoppingRule ((_,p1), (_,p2)) = p1 == p2
+
+     in map snd . takeWhile' (not . stoppingRule) $ pairedIteration
+
+-- Value iteration that keeps track of the iteration count as well.
+--policyIterationN:: Discount -> MDP -> [(Int, ValuePolicyPair)]
+policyIterationN β mdp = zip [2..] (policyIteration β mdp)
+
+-- Helper functions
 
 {-# INLINE spanNorm #-}
 spanNorm :: N.Vector Double -> N.Vector Double -> Double
 spanNorm u v = N.maxElement w - N.minElement w
       where w = u - v
+
+{-# INLINE takeRow #-}
+takeRow :: N.Element e => Int -> N.Matrix e -> N.Vector e
+takeRow idx mat = N.flatten . N.subMatrix (idx,0) (1, N.cols mat) $ mat
+
+-- Modified version of takeWhile
+
+takeWhile'               :: (a -> Bool) -> [a] -> [a]
+takeWhile' _ []          =  []
+takeWhile' p (x:xs) 
+             | p x       =  x : takeWhile' p xs
+             | otherwise =  x : [] 
+
