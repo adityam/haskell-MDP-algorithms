@@ -140,7 +140,9 @@ policyUpdate β mdp vp =
         --  $(I - β P(d))^{-1} r(d)$
         mdp'    = policyMDP β mdp p2
         matrix  = N.ident (stateSize mdp') - N.scale β (V.head . transition $ mdp')
-        v2      = N.inv matrix N.<> (V.head . reward $ mdp') 
+        -- In general, using linearSolve A B is more stable than calculating A^{-} B
+        -- v2      = N.inv matrix N.<> (V.head . reward $ mdp') 
+        v2      = matrix N.<\> (V.head . reward $ mdp')
     in (v2, p2)
 
 -- Start with the all zeros vector and run `bellmanUpdate` until the `spanNorm`
