@@ -213,7 +213,7 @@ policyIteration β mdp =
      in map snd . takeWhile' (not . uncurry stoppingRule) $ pairedIteration
 
 -- Value iteration that keeps track of the iteration count as well.
---policyIterationN:: Discount -> MDP -> [(Int, ValuePolicyPair)]
+policyIterationN:: Discount -> MDP -> [(Int, ValuePolicyPair)]
 policyIterationN β mdp = zip [2..] (policyIteration β mdp)
 
 -- Helper functions
