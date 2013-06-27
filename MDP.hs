@@ -3,11 +3,15 @@ module MDP
     MDP (..) , mkMDP
     -- Types
   , QFunction , VFunction , Policy , ValuePolicyPair
+    -- Update Function
   , qUpdate , vUpdate , bellmanUpdate 
   , policyMDP
+    -- Solution algorithms
   , valueIteration , valueIterationN
   , policyIteration, policyIterationN
+    -- Helper functions
   , spanNorm
+  , takeRow 
   ) where
 
 import qualified Data.Vector as V
