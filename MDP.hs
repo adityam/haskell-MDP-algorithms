@@ -11,7 +11,6 @@ module MDP
   , policyIteration, policyIterationN
     -- Helper functions
   , spanNorm
-  , takeRow 
   ) where
 
 import qualified Data.Vector as V
@@ -121,13 +120,13 @@ policyMDP β mdp policy =
        chosenMatrices :: V.Vector (N.Matrix Double)
        chosenMatrices = V.backpermute (transition mdp) policy
 
-       -- We can find the pMatrix by matrix multilincation, but it is cheaper
+       -- We can find the pMatrix by matrix multiplication, but it is cheaper
        -- to select rows from a matrix
        --
        --       pMatrix = V.zipWith (N.<>) units chosenMatrices
        --
        pMatrix :: V.Vector (N.Vector Double)
-       pMatrix = V.imap takeRow chosenMatrices
+       pMatrix = V.imap (\i -> N.flatten . N.extractRows [i])  chosenMatrices
 
     in mdp { reward     = V.singleton . N.fromList . V.toList $ rFunction 
            , transition = V.singleton . N.fromRows . V.toList $ pMatrix 
@@ -226,10 +225,6 @@ policyIterationN β mdp = zip [2..] (policyIteration β mdp)
 spanNorm :: N.Vector Double -> N.Vector Double -> Double
 spanNorm u v = N.maxElement w - N.minElement w
       where w = u - v
-
-{-# INLINE takeRow #-}
-takeRow :: N.Element e => Int -> N.Matrix e -> N.Vector e
-takeRow idx mat = N.flatten . N.subMatrix (idx,0) (1, N.cols mat) $ mat
 
 -- Modified version of takeWhile
 

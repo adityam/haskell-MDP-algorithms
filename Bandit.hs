@@ -32,7 +32,7 @@ gittinsIndexAt β (Bandit s r p)  state = (1-β) * (value N.@> state) where
     mdp :: MDP.MDP
     mdp = MDP.MDP s
                   2 -- 1st action is continue, 2nd action is restart
-                  (V.fromList [r, N.konst (r N.@> state)  s])
-                  (V.fromList [p, N.fromRows (replicate s (MDP.takeRow state p))])
+                  (V.fromList [r, N.constant (r N.@> state)  s])
+                  (V.fromList [p, N.repmat (N.extractRows [state] p) s 1])
     (value, _) = last $ MDP.policyIteration β mdp
 
