@@ -103,8 +103,8 @@ bellmanUpdate β mdp = vUpdate . qUpdate β mdp
 policyMDP :: Discount -> MDP -> Policy -> MDP
 policyMDP β mdp policy =
     let
-       units :: V.Vector (N.Vector Double)
-       units   = V.fromList . N.toRows . N.ident $ stateSize mdp
+       -- units :: V.Vector (N.Vector Double)
+       -- units   = V.fromList . N.toRows . N.ident $ stateSize mdp
 
        chosenReward :: V.Vector (N.Vector Double)
        chosenReward = V.backpermute (reward mdp) policy
