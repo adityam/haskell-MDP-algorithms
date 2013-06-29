@@ -100,8 +100,8 @@ bellmanUpdate β mdp = vUpdate . qUpdate β mdp
 -- Construct a MDP corresponding to a single policy 
 
 -- {-# INLINE policyMDP #-}
-policyMDP :: Discount -> MDP -> Policy -> MDP
-policyMDP β mdp policy =
+policyMDP :: MDP -> Policy -> MDP
+policyMDP mdp policy =
     let
        -- units :: V.Vector (N.Vector Double)
        -- units   = V.fromList . N.toRows . N.ident $ stateSize mdp
@@ -141,7 +141,7 @@ policyUpdate β mdp vp =
 
         --  Find performance of best response policy using
         --  $(I - β P(d))^{-1} r(d)$
-        mdp'    = policyMDP β mdp p2
+        mdp'    = policyMDP mdp p2
         matrix  = N.ident (stateSize mdp') - N.scale β (V.head . transition $ mdp')
         -- In general, using linearSolve A B is more stable than calculating A^{-1} B
         -- v2      = N.inv matrix N.<> (V.head . reward $ mdp') 
