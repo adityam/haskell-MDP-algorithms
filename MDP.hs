@@ -75,16 +75,13 @@ type Discount = Double
 
 {-# INLINE qUpdate #-}
 qUpdate :: Discount -> MDP -> ValuePolicyPair -> QFunction
-qUpdate β mdp (vFunction,_) = N.fromColumns . V.toList $ qMatrix
+qUpdate β mdp@(MDP _ _ reward_ transition_) (vFunction,_) = N.fromColumns . V.toList $ qMatrix
     where
-    rFunction = reward mdp     -- The collection of vectors  $\{ r(⋅, u) | u \in A \}$
-    pMatrices = transition mdp -- The collection of matrices $\{ P(u) | u \in A \}$
-
     scaledVFunction = N.scale β vFunction -- See note about micro-optimization above
 
     -- TODO: Parallelize the computation of expectedCostToGo
-    expectedCostToGo = V.map (N.<> scaledVFunction) pMatrices -- This is the second term of the summand
-    qMatrix  = V.zipWith (+) rFunction expectedCostToGo
+    expectedCostToGo = V.map (N.<> scaledVFunction) transition_ -- This is the second term of the summand
+    qMatrix  = V.zipWith (+) reward_ expectedCostToGo
 
 -- Value update is given by
 -- 
@@ -92,7 +89,8 @@ qUpdate β mdp (vFunction,_) = N.fromColumns . V.toList $ qMatrix
 
 {-# INLINE vUpdate #-}
 vUpdate :: QFunction -> ValuePolicyPair
-vUpdate  = (N.fromList *** V.fromList) . unzip . map (N.maxElement &&& N.maxIndex) . N.toRows
+vUpdate  = (N.fromList . V.toList *** id) 
+         . V.unzip . V.map (N.maxElement &&& N.maxIndex) . V.fromList . N.toRows
 
 -- Bellman update is the composition of `vUpdate` and `qUpdate`.
 
@@ -105,13 +103,13 @@ bellmanUpdate β mdp = vUpdate . qUpdate β mdp
 
 -- {-# INLINE policyMDP #-}
 policyMDP :: MDP -> Policy -> MDP
-policyMDP mdp policy =
+policyMDP mdp@(MDP _ _ reward_ transition_) policy =
     let
        -- units :: V.Vector (N.Vector Double)
        -- units   = V.fromList . N.toRows . N.ident $ stateSize mdp
 
        chosenReward :: V.Vector (N.Vector Double)
-       chosenReward = V.backpermute (reward mdp) policy
+       chosenReward = V.backpermute reward_ policy
 
        -- We can find the rFunction by matrix multilincation, but it is cheaper
        -- to select elements from a vector
@@ -122,7 +120,7 @@ policyMDP mdp policy =
        rFunction = V.imap (flip (N.@>)) chosenReward
 
        chosenMatrices :: V.Vector (N.Matrix Double)
-       chosenMatrices = V.backpermute (transition mdp) policy
+       chosenMatrices = V.backpermute transition_ policy
 
        -- We can find the pMatrix by matrix multiplication, but it is cheaper
        -- to select rows from a matrix
@@ -145,11 +143,11 @@ policyUpdate β mdp vp =
 
         --  Find performance of best response policy using
         --  $(I - β P(d))^{-1} r(d)$
-        mdp'    = policyMDP mdp p2
-        matrix  = N.ident (stateSize mdp') - N.scale β (V.head . transition $ mdp')
+        mdp'@(MDP s _ reward' transition') = policyMDP mdp p2
+        matrix  = N.ident s - N.scale β (V.head transition')
         -- In general, using linearSolve A B is more stable than calculating A^{-1} B
         -- v2      = N.inv matrix N.<> (V.head . reward $ mdp') 
-        v2      = matrix N.<\> (V.head . reward $ mdp')
+        v2      = matrix N.<\> (V.head reward')
     in (v2, p2)
 
 -- Start with the all zeros vector and run `bellmanUpdate` until the `spanNorm`
@@ -165,7 +163,7 @@ policyUpdate β mdp vp =
 --      take n . valueIterationN ε β $ mdp
 
 valueIteration :: Double -> Discount -> MDP -> [ValuePolicyPair]
-valueIteration ε β mdp = 
+valueIteration ε β mdp@(MDP s a _ _) = 
     let 
         k = if β < 1 
                then (1-β)/β
@@ -173,7 +171,7 @@ valueIteration ε β mdp =
         δ = k*ε
 
         initial :: ValuePolicyPair 
-        initial = (N.konst 0 (stateSize mdp), V.replicate (actionSize mdp) 0)
+        initial = (N.constant 0 s, V.replicate a 0)
 
         bellmanUpdate' :: ValuePolicyPair -> ValuePolicyPair
         bellmanUpdate' = bellmanUpdate β mdp
@@ -199,10 +197,10 @@ valueIterationN:: Double -> Discount-> MDP -> [(Int, ValuePolicyPair)]
 valueIterationN ε β mdp = zip [2..] (valueIteration ε β mdp)
 
 policyIteration :: Discount -> MDP -> [ValuePolicyPair]
-policyIteration β mdp = 
+policyIteration β mdp@(MDP s a _ _) = 
     let 
         initial :: ValuePolicyPair 
-        initial = (N.konst 0 (stateSize mdp), V.replicate (actionSize mdp) 0)
+        initial = (N.constant 0 s, V.replicate a 0)
 
         policyUpdate' :: ValuePolicyPair -> ValuePolicyPair
         policyUpdate' = policyUpdate β mdp

@@ -37,7 +37,7 @@ module Bandit
 import qualified Numeric.LinearAlgebra as N
 import qualified Data.Vector as V
 import qualified MDP as MDP
-import Control.Arrow ( (&&&) )
+import Control.Arrow ( (&&&), (***) )
 import Data.Maybe (fromJust)
 
 data Bandit = Bandit
@@ -72,10 +72,17 @@ gittinsIndex β (Bandit s r p) = go s nothing  where
        -> V.Vector Double   -- Collected gittins index
     go n gittins = 
         let 
+            {-
             -- Select columns for which the Gittins index is calucluated
             p_mask = N.fromList . V.toList . V.map (maybe 0 (const 1))     $ gittins
+
             -- Set the reward of states for which Gittins index is calculated to -Inf
             r_mask = N.fromList . V.toList . V.map (maybe 1 (const n_inf)) $ gittins
+            -}
+            -- Optimized version:
+            (p_mask, r_mask) = (N.fromList . V.toList *** N.fromList . V.toList) 
+                             . V.unzip . V.map (maybe (0,1) (const (1, n_inf)))
+                             $ gittins
 
             prob = p N.<> (N.diag p_mask)
             discounted_p = eye - (N.scale β prob)
