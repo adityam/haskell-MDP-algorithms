@@ -61,11 +61,14 @@ gittinsIndex β (Bandit s r p) = go s nothing  where
             _ -> go (n-1) gittins'
 
 -- Use Katehakis and Veinott's "restart in x" algorithm to calculate Gittins index
-gittinsIndexAt :: Discount -> Bandit -> Int -> Double
-gittinsIndexAt β (Bandit s r p)  state = (1-β) * (value N.@> state) where
+gittinsIndexAt :: Discount -> Bandit -> Int -> (Double, V.Vector Int)
+gittinsIndexAt β (Bandit s r p)  state = (idx, stopping_set) where
     mdp :: MDP.MDP
     mdp = MDP.MDP s
-                  2 -- 1st action is continue, 2nd action is restart
+                  2 -- 0 action is continue, 1 action is restart
                   (V.fromList [r, N.constant (r N.@> state)  s])
                   (V.fromList [p, N.repmat (N.extractRows [state] p) s 1])
-    (value, _) = last $ MDP.policyIteration β mdp
+    (value, policy) = last $ MDP.policyIteration β mdp
+
+    idx = (1-β) * (value N.@> state)
+    stopping_set = V.findIndices ( == 1) policy
