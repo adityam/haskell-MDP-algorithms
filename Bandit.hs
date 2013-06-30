@@ -1,3 +1,32 @@
+-- (c) Aditya Mahajan <aditya.mahajan@mcgill.ca>
+-- | Haskell library that implements the following algorithms to compute Gittins
+-- index for a Markovian bandit:
+--
+-- 1. Largest remaining index algorithm proposed by 
+--      
+--      > Varaiya, Walrand, Buyyucuk, "Extensions of the multiarmed bandit
+--      > problem: The discounted case", IEEE Transaction on Automatic Control,
+--      > May 1985.
+--
+--      This is an off-line algorithm that gives the Gittins index of all
+--      states.
+--
+--     
+--              gittinsIndex :: Discount -> Bandit -> V.Vector Double
+--      
+--
+-- 2. Restart algorithm proposed by
+--
+--      > Katehakis and Veinott, "The multiarmed bandit problem: Decomposition
+--      > and computation", Mathematics of Operations Research, May 1987.
+--
+--      This is an on-line algorithm that gives the Gittins index (and the
+--      stopping set) of one state.
+--
+--     
+--              gittinsIndexAt :: Discount -> Bandit -> Int -> (Int, V.Vector Double)
+
+
 module Bandit 
   ( -- Model
     Bandit(..), mkBandit
@@ -23,7 +52,7 @@ mkBandit :: Int -> [Double] -> [[Double]] -> Bandit
 mkBandit stateSize_ reward_ transition_ = 
   Bandit stateSize_ (N.fromList reward_) (N.fromLists transition_)
 
--- Use Varaiya Walrand and Buyyucuck algorithm to calculate Gittins index.
+-- Use Varaiya Walrand and Buyyucuk algorithm to calculate Gittins index.
 gittinsIndex :: Discount -> Bandit -> V.Vector Double
 gittinsIndex β (Bandit s r p) = go s nothing  where
     eye :: N.Matrix Double

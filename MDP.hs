@@ -1,3 +1,7 @@
+-- (c) Aditya Mahajan <aditya.mahajan@mcgill.ca> (29 June, 2013)
+-- | Haskell library that implements value iteration and policy iteration
+-- algorithms for infinite horizon discounted cost Markov decision processes.
+
 module MDP 
   ( -- Model
     MDP (..) , mkMDP
